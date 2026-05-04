@@ -1,20 +1,19 @@
 require("dotenv").config();
 
 const TelegramBot = require("node-telegram-bot-api");
-const { OpenAI } = require("openai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, {
     polling: true
 });
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_KEY
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // 🧠 Memory
 const memory = {};
 
-// 📊 Your channel knowledge
+// 📊 Your channel data
 const channelData = `
 Channel: @jv_60fps
 
@@ -41,31 +40,25 @@ bot.on("message", async (msg) => {
     try {
         if (!memory[chatId]) memory[chatId] = [];
 
-        memory[chatId].push({ role: "user", content: text });
+        memory[chatId].push(`User: ${text}`);
         memory[chatId] = memory[chatId].slice(-10);
 
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                {
-                    role: "system",
-                    content: `You are an AI support bot for Telegram channel @jv_60fps.
+        const prompt = `
+You are an AI support bot for Telegram channel @jv_60fps.
 
 Use this info:
 ${channelData}
 
-- Answer product questions clearly
-- Help fix issues
-- Be friendly and short
-- If not related, reply normally`
-                },
-                ...memory[chatId]
-            ]
-        });
+Conversation:
+${memory[chatId].join("\n")}
 
-        const reply = response.choices[0].message.content;
+Reply helpfully and short:
+`;
 
-        memory[chatId].push({ role: "assistant", content: reply });
+        const result = await model.generateContent(prompt);
+        const reply = result.response.text();
+
+        memory[chatId].push(`Bot: ${reply}`);
 
         bot.sendMessage(chatId, "🤖 " + reply);
 
