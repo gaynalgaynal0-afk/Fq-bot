@@ -1,14 +1,13 @@
 {
-  "name": "telegram-ai-bot",
+  "name": "telegram-gemini-bot",
   "version": "1.0.0",
   "main": "bot.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node bot.js"
   },
   "dependencies": {
     "node-telegram-bot-api": "^0.61.0",
-    "openai": "^4.0.0",
+    "@google/generative-ai": "^0.5.0",
     "dotenv": "^16.0.0"
   }
 }
