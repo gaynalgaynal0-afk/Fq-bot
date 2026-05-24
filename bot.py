@@ -55,15 +55,7 @@ def check_ffmpeg():
         return False
 
 async def convert_to_wmv(input_path, output_path):
-    cmd = [
-        "ffmpeg", "-i", input_path,
-        "-c:v", "wmv2",
-        "-q:v", "2",        # highest quality (2=best, 31=worst)
-        "-c:a", "wmav2",
-        "-q:a", "2",        # highest audio quality
-        "-f", "asf",
-        "-y", output_path,
-    ]
+    cmd = ["ffmpeg", "-i", input_path, "-c:v", "wmv2", "-c:a", "wmav2", "-b:v", "1500k", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-f", "asf", "-y", output_path]
     try:
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
