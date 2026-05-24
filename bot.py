@@ -4,14 +4,9 @@ import asyncio
 import subprocess
 import tempfile
 import shutil
+import threading
 from pathlib import Path
-
-# Fix for Python 3.14 compatibility
-import sys
-if sys.version_info >= (3, 12):
-    import asyncio
-    if not hasattr(asyncio, 'get_event_loop'):
-        asyncio.get_event_loop = asyncio.get_running_loop
+from flask import Flask
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -24,15 +19,30 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 MINI_APP_URL = "https://patcher.joym73021.workers.dev/"
+PORT = int(os.environ.get("PORT", 5000))
 
 SUPPORTED_FORMATS = [
     "mp4","avi","mov","mkv","flv","webm","m4v","3gp",
     "ogv","ts","mts","m2ts","wmv","asf","rm","rmvb",
     "vob","mpeg","mpg"
 ]
-
 MAX_FILE_SIZE_MB = 50
 
+# ── Tiny Flask server to satisfy Render's port check ─────────────────────────
+flask_app = Flask(__name__)
+
+@flask_app.route("/")
+def index():
+    return "Bot is running!", 200
+
+@flask_app.route("/health")
+def health():
+    return {"status": "ok"}, 200
+
+def run_flask():
+    flask_app.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False)
+
+# ── Bot handlers ──────────────────────────────────────────────────────────────
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[
@@ -166,19 +176,19 @@ def main():
     if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
         raise ValueError("BOT_TOKEN environment variable is not set!")
 
-    app = (
-        Application.builder()
-        .token(BOT_TOKEN)
-        .concurrent_updates(False)
-        .build()
-    )
+    # Start Flask in background thread
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logger.info(f"Flask server started on port {PORT}")
 
+    # Start Telegram bot
+    app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.VIDEO | filters.Document.ALL, handle_video))
 
     logger.info("Bot started!")
-    app.run_polling(drop_pending_updates=True, close_loop=False)
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
