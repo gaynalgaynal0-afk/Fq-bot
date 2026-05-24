@@ -54,13 +54,41 @@ def check_ffmpeg():
     except Exception:
         return False
 
+def get_video_duration(input_path):
+    """Get video duration in seconds using ffprobe."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", input_path],
+            capture_output=True, text=True, timeout=30
+        )
+        return float(result.stdout.strip())
+    except Exception:
+        return None
+
+
 async def convert_to_wmv(input_path, output_path):
+    # Get duration to calculate best bitrate that fits in 50MB
+    duration = get_video_duration(input_path)
+
+    if duration and duration > 0:
+        # Target 48MB (leave 2MB buffer for audio/container)
+        target_size_bits = 48 * 1024 * 1024 * 8
+        audio_bitrate = 128 * 1000  # 128kbps audio
+        video_bitrate = int((target_size_bits / duration - audio_bitrate) / 1000)
+        video_bitrate = max(300, min(video_bitrate, 8000))  # clamp 300k-8000k
+        v_bitrate = f"{video_bitrate}k"
+    else:
+        v_bitrate = "2000k"  # fallback
+
     cmd = [
         "ffmpeg", "-i", input_path,
         "-c:v", "wmv2",
-        "-q:v", "2",        # highest quality (2=best, 31=worst)
+        "-b:v", v_bitrate,
         "-c:a", "wmav2",
-        "-q:a", "2",        # highest audio quality
+        "-b:a", "128k",
+        "-ar", "44100",
+        "-ac", "2",
         "-f", "asf",
         "-y", output_path,
     ]
