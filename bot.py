@@ -11,24 +11,22 @@ from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 MINI_APP_URL = "https://patcher.joym73021.workers.dev/"
 PORT = int(os.environ.get("PORT", 5000))
 
-SUPPORTED_FORMATS = [
-    "mp4","avi","mov","mkv","flv","webm","m4v","3gp",
-    "ogv","ts","mts","m2ts","wmv","asf","rm","rmvb",
-    "vob","mpeg","mpg"
-]
+SUPPORTED_FORMATS = ["mp4","avi","mov","mkv","flv","webm","m4v","3gp","ogv","ts","mts","m2ts","wmv","asf","rm","rmvb","vob","mpeg","mpg"]
 MAX_FILE_SIZE_MB = 50
 
-# ── Tiny Flask server to satisfy Render's port check ─────────────────────────
+START_MSG = ("\U0001f3ac __*TIKTOK Studio method*__\n\n"
+    ">If you want to use the TIKTOK studio method sent a video file directly in chat\n"
+    "**>\u2705 Supported: mp4, avi, mov, mkv, flv, webm, m4v, 3gp\\.\\.\\.\n"
+    "*\U0001f4e6 Max size: 50MB*")
+CAPTION_MSG = ">__*Upload this video using JV 60FPS studio extension*__"
+
 flask_app = Flask(__name__)
 
 @flask_app.route("/")
@@ -42,33 +40,12 @@ def health():
 def run_flask():
     flask_app.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False)
 
-# ── Bot handlers ──────────────────────────────────────────────────────────────
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[
-        InlineKeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))
-    ]]
-    await update.message.reply_text(
-        "__*🎬 TIKTOK Studio method*__
-
-"
-        ">If you want to use the TIKTOK studio method sent a video file directly in chat
-"
-        "**>✅ Supported: mp4, avi, mov, mkv, flv, webm, m4v, 3gp\.\.\.
-"
-        "*📦 Max size: 50MB*",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
+    keyboard = [[InlineKeyboardButton("\U0001f527 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))]]
+    await update.message.reply_text(START_MSG, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📖 Send any video file to convert it to WMV.\n\n"
-        "Codec: wmv2 | Audio: wmav2 | Container: ASF\n"
-        "This is REAL WMV, not a renamed file!"
-    )
-
+    await update.message.reply_text("Send any video file to convert it to WMV\nCodec: wmv2 | Audio: wmav2 | Container: ASF")
 
 def check_ffmpeg():
     try:
@@ -77,25 +54,10 @@ def check_ffmpeg():
     except Exception:
         return False
 
-
 async def convert_to_wmv(input_path, output_path):
-    cmd = [
-        "ffmpeg", "-i", input_path,
-        "-c:v", "wmv2",
-        "-c:a", "wmav2",
-        "-b:v", "1500k",
-        "-b:a", "128k",
-        "-ar", "44100",
-        "-ac", "2",
-        "-f", "asf",
-        "-y", output_path,
-    ]
+    cmd = ["ffmpeg", "-i", input_path, "-c:v", "wmv2", "-c:a", "wmav2", "-b:v", "1500k", "-b:a", "128k", "-ar", "44100", "-ac", "2", "-f", "asf", "-y", output_path]
     try:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
         if proc.returncode == 0:
             return True, "OK"
@@ -105,7 +67,6 @@ async def convert_to_wmv(input_path, output_path):
     except Exception as e:
         return False, str(e)
 
-
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     file_obj = None
@@ -113,7 +74,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if message.video:
         file_obj = message.video
-        original_name = "video"
     elif message.document:
         doc = message.document
         fname = doc.file_name or ""
@@ -123,21 +83,19 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             original_name = fname or "video"
 
     if not file_obj:
-        await message.reply_text(
-            f"⚠️ Please send a video file.\nSupported: {', '.join(SUPPORTED_FORMATS)}"
-        )
+        await message.reply_text("Please send a video file.\nSupported: " + ", ".join(SUPPORTED_FORMATS))
         return
 
     size_mb = (file_obj.file_size or 0) / 1024 / 1024
     if size_mb > MAX_FILE_SIZE_MB:
-        await message.reply_text(f"❌ File too large ({size_mb:.1f}MB). Max: {MAX_FILE_SIZE_MB}MB")
+        await message.reply_text(f"File too large ({size_mb:.1f}MB). Max: {MAX_FILE_SIZE_MB}MB")
         return
 
     if not check_ffmpeg():
-        await message.reply_text("❌ FFmpeg not found on this server.")
+        await message.reply_text("FFmpeg not found on this server.")
         return
 
-    status = await message.reply_text("⬇️ Downloading...")
+    status = await message.reply_text("Downloading...")
     tmp_dir = tempfile.mkdtemp(prefix="wmv_")
 
     try:
@@ -148,46 +106,42 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         tg_file = await context.bot.get_file(file_obj.file_id)
         await tg_file.download_to_drive(input_path)
-        await status.edit_text("🔄 Converting to WMV...")
+        await status.edit_text("Converting to WMV...")
 
         ok, msg = await convert_to_wmv(input_path, output_path)
         if not ok:
-            await status.edit_text(f"❌ Conversion failed:\n`{msg}`", parse_mode="Markdown")
+            await status.edit_text(f"Conversion failed.")
             return
 
         out_mb = os.path.getsize(output_path) / 1024 / 1024
         if out_mb > 50:
-            await status.edit_text(f"❌ Output too large ({out_mb:.1f}MB) to send.")
+            await status.edit_text(f"Output too large ({out_mb:.1f}MB) to send.")
             return
 
-        await status.edit_text("⬆️ Uploading...")
+        await status.edit_text("Uploading...")
         with open(output_path, "rb") as f:
             await message.reply_document(
                 document=f,
                 filename=output_name,
-                caption=">__*Upload this video using JV 60FPS studio extension*__",
-                parse_mode="MarkdownV2",
+                caption=CAPTION_MSG,
                 parse_mode="MarkdownV2",
             )
         await status.delete()
 
     except Exception as e:
         logger.exception("Error")
-        await status.edit_text(f"❌ Error: {e}")
+        await status.edit_text(f"Error: {e}")
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-
 
 def main():
     if not BOT_TOKEN or BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
         raise ValueError("BOT_TOKEN environment variable is not set!")
 
-    # Start Flask in background thread
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logger.info(f"Flask server started on port {PORT}")
 
-    # Start Telegram bot
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -195,7 +149,6 @@ def main():
 
     logger.info("Bot started!")
     app.run_polling(drop_pending_updates=True)
-
 
 if __name__ == "__main__":
     main()
