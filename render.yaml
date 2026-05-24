@@ -1,11 +1,34 @@
 services:
+  # ── Web service (Flask + Mini App) ────────────────────────────────────────
   - type: web
-    name: jv60fps-bot
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn bot:app
+    name: wmv-bot-server
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      pip install -r requirements.txt
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2
+    envVars:
+      - key: SECRET_PATH
+        value: /secret-tools          # <-- change this to your own secret path!
+      - key: MINI_APP_URL
+        sync: false                   # set manually in Render dashboard
+
+  # ── Background worker (Telegram Bot) ─────────────────────────────────────
+  - type: worker
+    name: wmv-bot-worker
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      pip install -r requirements.txt
+    startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
-        sync: false
-      - key: WEBHOOK_URL
-        sync: false
+        sync: false                   # set in Render dashboard (secret)
+      - key: MINI_APP_URL
+        sync: false                   # your Render web URL, e.g. https://wmv-bot-server.onrender.com
+      - key: SECRET_PATH
+        value: /secret-tools          # must match the web service above

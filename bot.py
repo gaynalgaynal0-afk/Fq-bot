@@ -1,197 +1,259 @@
-"""
-JV-60FPS Telegram Bot — Binary Patch
-Deployed on Render via webhook
-"""
-
 import os
-import struct
+import logging
+import asyncio
+import subprocess
 import tempfile
-import requests
-import json
-import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from flask import Flask, request, abort
+import shutil
+from pathlib import Path
 
-# ─────────────────────────────────────────
-#  CONFIG (set as Render env vars)
-# ─────────────────────────────────────────
-BOT_TOKEN   = os.environ["BOT_TOKEN"]
-WEBHOOK_URL = os.environ["WEBHOOK_URL"]   # e.g. https://jv60fps-bot.onrender.com
-NETLIFY_URL = "https://loquacious-speculoos-2613c5.netlify.app/.netlify/functions/get_bypass_config"
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+)
 
-bot = telebot.TeleBot(BOT_TOKEN, threaded=False)
-app = Flask(__name__)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
 
-waiting_for_video = set()
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+MINI_APP_URL = os.environ.get("MINI_APP_URL", "https://your-render-app.onrender.com/app")
+SECRET_PATH = os.environ.get("SECRET_PATH", "/secret-tools")
+MAX_FILE_SIZE_MB = 50  # Telegram Bot API limit for downloads
 
-# ─────────────────────────────────────────
-#  PATCH LOGIC
-# ─────────────────────────────────────────
-def get_bypass_payload():
-    # FIX 1: added raise_for_status so a Netlify error doesn't silently return None
-    r = requests.post(NETLIFY_URL, timeout=15)
-    r.raise_for_status()
-    data = r.json()
-    if data.get("success"):
-        return int(data["payload"])   # FIX 2: force int — JSON sometimes returns float
-    return None
+SUPPORTED_FORMATS = [
+    "mp4", "avi", "mov", "mkv", "flv", "webm",
+    "m4v", "3gp", "ogv", "ts", "mts", "m2ts",
+    "wmv", "asf", "rm", "rmvb", "vob", "mpeg", "mpg"
+]
 
-def patch_video(raw: bytes, payload: int):
-    idx = raw.find(b'elst')
-    if idx == -1:
-        return None
-    data = bytearray(raw)
-    struct.pack_into('>I', data, idx + 8, payload)
-    return bytes(data)
 
-# ─────────────────────────────────────────
-#  BOT HANDLERS
-# ─────────────────────────────────────────
-@bot.message_handler(commands=['start'])
-def start(msg):
-    waiting_for_video.discard(msg.chat.id)
-    mk = InlineKeyboardMarkup(row_width=1)
-    mk.add(
-        InlineKeyboardButton("⚡ Binary Patch", callback_data="binary_patch"),
-        InlineKeyboardButton("🕒 Time Patch",   callback_data="time_patch"),
-    )
-    bot.send_message(
-        msg.chat.id,
-        "╔══════════════════╗\n"
-        "║   JV-60FPS BOT   ║\n"
-        "╚══════════════════╝\n\n"
-        "Choose a patch mode:",
-        reply_markup=mk
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Start command with Mini App button."""
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🔧 Open Tools Panel",
+                web_app=WebAppInfo(url=f"{MINI_APP_URL}{SECRET_PATH}"),
+            )
+        ],
+        [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🎬 *WMV Converter Bot*\n\n"
+        "Send me any video file and I'll convert it to *real WMV* format using FFmpeg with Windows Media Video codec.\n\n"
+        f"✅ Supported formats: {', '.join(SUPPORTED_FORMATS[:8])}... and more\n"
+        "📦 Max file size: 50MB\n\n"
+        "Just send a video file to get started!",
+        parse_mode="Markdown",
+        reply_markup=reply_markup,
     )
 
-@bot.callback_query_handler(func=lambda c: True)
-def handle_cb(call):
-    cid = call.message.chat.id
-    bot.answer_callback_query(call.id)
-    if call.data == "binary_patch":
-        waiting_for_video.add(cid)
-        # FIX 3: removed MarkdownV2 from this message — the plain text has no
-        # special chars that need escaping, but MarkdownV2 was crashing on the
-        # period in "patched file." causing MessageTextIsEmpty / bad request
-        bot.send_message(
-            cid,
-            "📹 Binary Patch Mode\n\n"
-            "Send your video now.\n"
-            "Bot will inject the 120FPS bypass payload and return the patched file."
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📖 *How to use:*\n\n"
+        "1. Send any video file (mp4, avi, mov, mkv, etc.)\n"
+        "2. The bot will convert it to genuine WMV (Windows Media Video)\n"
+        "3. Download your WMV file\n\n"
+        "🔧 *Technical details:*\n"
+        "• Codec: Windows Media Video 2 (wmv2)\n"
+        "• Audio: Windows Media Audio v2 (wmav2)\n"
+        "• Container: ASF (Advanced Systems Format)\n"
+        "• This is REAL WMV, not a renamed file!\n\n"
+        "📏 *Limits:*\n"
+        "• Max file size: 50MB",
+        parse_mode="Markdown",
+    )
+
+
+def check_ffmpeg():
+    """Check if FFmpeg is installed."""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
-    elif call.data == "time_patch":
-        bot.send_message(cid, "🕒 Time Patch — Coming soon!")
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
 
-@bot.message_handler(content_types=['video', 'document'])
-def handle_video(msg):
-    cid = msg.chat.id
-    if cid not in waiting_for_video:
-        bot.send_message(cid, "Tap ⚡ Binary Patch first, then send your video.")
-        return
 
-    if msg.content_type == 'video':
-        file_id   = msg.video.file_id
-        file_name = f"video_{msg.video.file_unique_id}.mp4"
-    else:
-        doc = msg.document
-        mime = doc.mime_type or ""
-        name = doc.file_name or ""
-        if "video/mp4" not in mime and not name.lower().endswith('.mp4'):
-            bot.send_message(cid, "⚠️ Please send an MP4 file.")
-            return
-        file_id   = doc.file_id
-        file_name = name or "video.mp4"
-
-    waiting_for_video.discard(cid)
-    status = bot.send_message(cid, "⏳ Downloading video...")
+async def convert_to_wmv(input_path: str, output_path: str) -> tuple[bool, str]:
+    """
+    Convert video to REAL WMV using FFmpeg with WMV2 codec.
+    Returns (success, message).
+    """
+    cmd = [
+        "ffmpeg",
+        "-i", input_path,
+        "-c:v", "wmv2",           # Windows Media Video 2 codec (real WMV)
+        "-c:a", "wmav2",          # Windows Media Audio v2
+        "-b:v", "1500k",          # Video bitrate
+        "-b:a", "128k",           # Audio bitrate
+        "-ar", "44100",           # Audio sample rate
+        "-ac", "2",               # Stereo audio
+        "-f", "asf",              # ASF container (WMV container format)
+        "-y",                     # Overwrite output
+        output_path,
+    ]
 
     try:
-        # 1. Download
-        info = bot.get_file(file_id)
-        # FIX 4: Telegram only allows bot.get_file for files up to 20MB.
-        # Files over 20MB need a local bot server or workaround.
-        # We check size and warn the user instead of silently crashing.
-        file_size = None
-        if msg.content_type == 'video' and msg.video.file_size:
-            file_size = msg.video.file_size
-        elif msg.content_type == 'document' and msg.document.file_size:
-            file_size = msg.document.file_size
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(), timeout=300
+        )
 
-        if file_size and file_size > 20 * 1024 * 1024:
-            bot.edit_message_text(
-                "⚠️ File is over 20MB — Telegram bot API limit.\n"
-                "Compress your video below 20MB and try again.",
-                cid, status.message_id
+        if process.returncode == 0:
+            return True, "Conversion successful"
+        else:
+            error_msg = stderr.decode("utf-8", errors="replace")[-500:]
+            return False, f"FFmpeg error: {error_msg}"
+
+    except asyncio.TimeoutError:
+        return False, "Conversion timed out (>5 minutes)"
+    except Exception as e:
+        return False, f"Unexpected error: {str(e)}"
+
+
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle incoming video/document files."""
+    message = update.message
+
+    # Determine if it's a video or document
+    file_obj = None
+    original_name = "video"
+
+    if message.video:
+        file_obj = message.video
+        original_name = f"video_{message.video.file_unique_id}"
+    elif message.document:
+        doc = message.document
+        if doc.mime_type and doc.mime_type.startswith("video/"):
+            file_obj = doc
+            original_name = doc.file_name or "video"
+        else:
+            # Check extension
+            if doc.file_name:
+                ext = Path(doc.file_name).suffix.lower().lstrip(".")
+                if ext in SUPPORTED_FORMATS:
+                    file_obj = doc
+                    original_name = doc.file_name
+            if not file_obj:
+                await message.reply_text(
+                    "⚠️ Please send a video file.\n"
+                    f"Supported: {', '.join(SUPPORTED_FORMATS)}"
+                )
+                return
+    else:
+        await message.reply_text(
+            "⚠️ Please send a video file.\n"
+            f"Supported formats: {', '.join(SUPPORTED_FORMATS)}"
+        )
+        return
+
+    # Check file size
+    file_size_mb = (file_obj.file_size or 0) / (1024 * 1024)
+    if file_size_mb > MAX_FILE_SIZE_MB:
+        await message.reply_text(
+            f"❌ File too large ({file_size_mb:.1f}MB).\n"
+            f"Maximum allowed: {MAX_FILE_SIZE_MB}MB"
+        )
+        return
+
+    if not check_ffmpeg():
+        await message.reply_text(
+            "❌ FFmpeg is not installed on this server.\n"
+            "Please install FFmpeg to use this bot."
+        )
+        return
+
+    status_msg = await message.reply_text("⬇️ Downloading your video...")
+
+    tmp_dir = tempfile.mkdtemp(prefix="wmvbot_")
+    try:
+        # Determine input extension
+        input_ext = "mp4"
+        if hasattr(file_obj, "file_name") and file_obj.file_name:
+            input_ext = Path(file_obj.file_name).suffix.lstrip(".") or "mp4"
+        elif message.video:
+            input_ext = "mp4"
+
+        input_path = os.path.join(tmp_dir, f"input.{input_ext}")
+        output_name = Path(original_name).stem + ".wmv"
+        output_path = os.path.join(tmp_dir, output_name)
+
+        # Download
+        tg_file = await context.bot.get_file(file_obj.file_id)
+        await tg_file.download_to_drive(input_path)
+
+        await status_msg.edit_text("🔄 Converting to WMV (wmv2 codec)...")
+
+        success, result_msg = await convert_to_wmv(input_path, output_path)
+
+        if not success:
+            await status_msg.edit_text(
+                f"❌ Conversion failed.\n\n`{result_msg}`",
+                parse_mode="Markdown",
             )
             return
 
-        url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{info.file_path}"
-        raw = requests.get(url, timeout=120).content
+        output_size_mb = os.path.getsize(output_path) / (1024 * 1024)
 
-        bot.edit_message_text("🔍 Fetching bypass payload...", cid, status.message_id)
-
-        # 2. Get cloud payload
-        payload = get_bypass_payload()
-        if payload is None:
-            bot.edit_message_text("❌ Cloud payload fetch failed. Try again.", cid, status.message_id)
-            return
-
-        bot.edit_message_text("💉 Injecting binary payload...", cid, status.message_id)
-
-        # 3. Patch
-        patched = patch_video(raw, payload)
-        if patched is None:
-            bot.edit_message_text(
-                "❌ 'elst' atom not found in this video.\n"
-                "Make sure it's a valid MP4 file.",
-                cid, status.message_id
+        if output_size_mb > 50:
+            await status_msg.edit_text(
+                f"❌ Output file too large ({output_size_mb:.1f}MB) to send via Telegram (50MB limit)."
             )
             return
 
-        bot.edit_message_text("📤 Sending patched video...", cid, status.message_id)
+        await status_msg.edit_text("⬆️ Uploading WMV file...")
 
-        # 4. Send back as document (keeps original quality, no Telegram re-encode)
-        out_name = file_name.lower().replace('.mp4', '_jv_120fps.mp4')
-        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp:
-            tmp.write(patched)
-            tmp_path = tmp.name
-
-        with open(tmp_path, 'rb') as f:
-            bot.send_document(
-                cid, f,
-                caption="✅ Patch complete!\n\nUpload to TikTok now 🚀",
-                visible_file_name=out_name
+        with open(output_path, "rb") as f:
+            await message.reply_document(
+                document=f,
+                filename=output_name,
+                caption=(
+                    f"✅ *Converted to WMV*\n\n"
+                    f"🎬 Codec: WMV2 (Windows Media Video 2)\n"
+                    f"🔊 Audio: WMAV2\n"
+                    f"📦 Container: ASF\n"
+                    f"📏 Size: {output_size_mb:.2f}MB"
+                ),
+                parse_mode="Markdown",
             )
-        os.remove(tmp_path)
-        bot.delete_message(cid, status.message_id)
+
+        await status_msg.delete()
 
     except Exception as e:
-        try:
-            bot.edit_message_text(f"❌ Error: {e}", cid, status.message_id)
-        except:
-            bot.send_message(cid, f"❌ Error: {e}")
+        logger.exception("Error processing video")
+        await status_msg.edit_text(f"❌ An error occurred: {str(e)}")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
-# ─────────────────────────────────────────
-#  FLASK WEBHOOK
-# ─────────────────────────────────────────
-@app.route(f"/{BOT_TOKEN}", methods=["POST"])
-def webhook():
-    if request.headers.get("content-type") == "application/json":
-        update = telebot.types.Update.de_json(request.get_data().decode("utf-8"))
-        bot.process_new_updates([update])
-        return "OK", 200
-    abort(403)
 
-@app.route("/", methods=["GET"])
-def index():
-    return "JV-60FPS Bot is running.", 200
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
 
-@app.route("/set_webhook", methods=["GET"])
-def set_webhook():
-    bot.remove_webhook()
-    result = bot.set_webhook(url=f"{WEBHOOK_URL}/{BOT_TOKEN}")
-    return f"Webhook set: {result}", 200
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.VIDEO | filters.Document.ALL, handle_video))
+
+    logger.info("Bot starting...")
+    app.run_polling(drop_pending_updates=True)
+
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    main()
