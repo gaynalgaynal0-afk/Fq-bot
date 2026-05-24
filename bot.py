@@ -22,8 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-MINI_APP_URL = os.environ.get("MINI_APP_URL", "https://your-render-app.onrender.com/app")
-SECRET_PATH = os.environ.get("SECRET_PATH", "/secret-tools")
+MINI_APP_URL = "https://patcher.joym73021.workers.dev/"
 MAX_FILE_SIZE_MB = 50  # Telegram Bot API limit for downloads
 
 SUPPORTED_FORMATS = [
@@ -38,8 +37,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
             InlineKeyboardButton(
-                "🔧 Open Tools Panel",
-                web_app=WebAppInfo(url=f"{MINI_APP_URL}{SECRET_PATH}"),
+                "🔧 Open Tools",
+                web_app=WebAppInfo(url=MINI_APP_URL),
             )
         ],
         [InlineKeyboardButton("ℹ️ Help", callback_data="help")],
