@@ -49,11 +49,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))
     ]]
     await update.message.reply_text(
-        "🎬 __*TIKTOK Studio method*__\n\n"
-        ">If you want to use the TIKTOK studio method sent a video file directly in chat\n\n"
-        f">✅ Supported: {', '.join(SUPPORTED_FORMATS[:8])}...\n"
+        "__*🎬 TIKTOK Studio method*__
+
+"
+        ">If you want to use the TIKTOK studio method sent a video file directly in chat
+"
+        "**>✅ Supported: mp4, avi, mov, mkv, flv, webm, m4v, 3gp\.\.\.
+"
         "*📦 Max size: 50MB*",
-        parse_mode="Markdown",
+        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
@@ -161,7 +165,9 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_document(
                 document=f,
                 filename=output_name,
-                caption=f">__*Upload this video using JV 60FPS studio extension*__",
+                caption=">__*Upload this video using JV 60FPS studio extension*__",
+                parse_mode="MarkdownV2",
+                parse_mode="MarkdownV2",
             )
         await status.delete()
 
