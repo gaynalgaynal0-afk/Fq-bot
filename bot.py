@@ -46,11 +46,11 @@ def run_flask():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[
-        InlineKeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))
+        InlineKeyboardButton("🔧 PERMANENT METHOD PATCHER", web_app=WebAppInfo(url=MINI_APP_URL))
     ]]
     await update.message.reply_text(
         "🎬 *WMV Converter Bot*\n\n"
-        "Send me any video and I'll convert it to *real WMV* (wmv2 codec).\n\n"
+        "Send me any video and I'll convert it to *Studio method* (wmv2 codec).\n\n"
         f"✅ Supported: {', '.join(SUPPORTED_FORMATS[:8])}...\n"
         "📦 Max size: 50MB",
         parse_mode="Markdown",
@@ -60,7 +60,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📖 Send any video file to convert it to WMV.\n\n"
+        "📖 Send any video file to make it ready for my Studio method.\n\n"
         "Codec: wmv2 | Audio: wmav2 | Container: ASF\n"
         "This is REAL WMV, not a renamed file!"
     )
@@ -105,7 +105,7 @@ async def convert_to_wmv(input_path, output_path):
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     file_obj = None
-    original_name = "video"
+    original_name = "studio"
 
     if message.video:
         file_obj = message.video
