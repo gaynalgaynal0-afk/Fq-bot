@@ -24,8 +24,7 @@ MAX_FILE_SIZE_MB = 50
 START_MSG = ("\U0001f3ac __*TIKTOK Studio method*__\n\n"
     ">If you want to use the TIKTOK studio method sent a video file directly in chat\n"
     "**>\u2705 Supported: mp4, avi, mov, mkv, flv, webm, m4v, 3gp\\.\\.\\.\n"
-    "*\U0001f4e6 Max size: 50MB*\n\n"
-    ">__*Important*__ Use smaller than 20mb to get lossless quality going bigger than 20mb will effect the quality")
+    "*\U0001f4e6 Max size: 50MB*")
 CAPTION_MSG = ">__*Upload this video using JV 60FPS studio extension*__"
 
 flask_app = Flask(__name__)
@@ -55,57 +54,16 @@ def check_ffmpeg():
     except Exception:
         return False
 
-def get_video_info(input_path):
-    """Get video duration in seconds using ffprobe."""
-    try:
-        result = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", input_path],
-            capture_output=True, text=True, timeout=30
-        )
-        return float(result.stdout.strip())
-    except Exception:
-        return None
-
-
 async def convert_to_wmv(input_path, output_path):
-    input_size_mb = os.path.getsize(input_path) / 1024 / 1024
-    duration = get_video_info(input_path)
-
-    if input_size_mb <= 20:
-        # Small file — use lossless best quality
-        cmd = [
-            "ffmpeg", "-i", input_path,
-            "-c:v", "wmv2",
-            "-q:v", "2",       # best quality, no size limit
-            "-c:a", "wmav2",
-            "-q:a", "2",       # best audio quality
-            "-f", "asf",
-            "-y", output_path,
-        ]
-    else:
-        # Big file — auto calculate bitrate to fit within 48MB
-        if duration and duration > 0:
-            target_bits = 48 * 1024 * 1024 * 8
-            audio_bits = 128 * 1000
-            video_bitrate = int((target_bits / duration - audio_bits) / 1000)
-            video_bitrate = max(300, min(video_bitrate, 8000))
-            v_bitrate = f"{video_bitrate}k"
-        else:
-            v_bitrate = "2000k"
-
-        cmd = [
-            "ffmpeg", "-i", input_path,
-            "-c:v", "wmv2",
-            "-b:v", v_bitrate,
-            "-c:a", "wmav2",
-            "-b:a", "128k",
-            "-ar", "44100",
-            "-ac", "2",
-            "-f", "asf",
-            "-y", output_path,
-        ]
-
+    cmd = [
+        "ffmpeg", "-i", input_path,
+        "-c:v", "wmv2",
+        "-q:v", "2",        # highest quality (2=best, 31=worst)
+        "-c:a", "wmav2",
+        "-q:a", "2",        # highest audio quality
+        "-f", "asf",
+        "-y", output_path,
+    ]
     try:
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
