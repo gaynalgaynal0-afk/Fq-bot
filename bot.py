@@ -15,7 +15,7 @@ logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-MINI_APP_URL = "https://patcher.joym73021.workers.dev/"
+MINI_APP_URL = "https://restless-star-a7e9.gaynalgaynal4.workers.dev/"
 PORT = int(os.environ.get("PORT", 5000))
 
 SUPPORTED_FORMATS = ["mp4","avi","mov","mkv","flv","webm","m4v","3gp","ogv","ts","mts","m2ts","wmv","asf","rm","rmvb","vob","mpeg","mpg"]
