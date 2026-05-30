@@ -1,21 +1,41 @@
-#!/usr/bin/env bash
-# start.sh — launches both the Flask web server and Telegram bot
-
+#!/bin/bash
 set -e
 
-echo "=== WMV Converter Bot ==="
-echo "Checking FFmpeg..."
-if command -v ffmpeg &>/dev/null; then
-  echo "✓ FFmpeg found: $(ffmpeg -version 2>&1 | head -1)"
-  echo "Checking WMV2 codec..."
-  ffmpeg -encoders 2>/dev/null | grep wmv2 && echo "✓ wmv2 encoder available" || echo "⚠ wmv2 not listed (may still work)"
-else
-  echo "⚠ FFmpeg not found! Install it for conversions to work."
+echo "==> Installing dependencies..."
+apt-get update -qq
+apt-get install -y -qq ffmpeg wget
+
+# Download prebuilt telegram-bot-api binary
+if [ ! -f /usr/local/bin/telegram-bot-api ]; then
+  echo "==> Downloading telegram-bot-api binary..."
+  wget -q https://github.com/tdlib/telegram-bot-api/releases/download/v7.11/telegram-bot-api-amd64-linux.zip -O /tmp/tgapi.zip
+  unzip -q /tmp/tgapi.zip -d /tmp/tgapi
+  mv /tmp/tgapi/telegram-bot-api /usr/local/bin/telegram-bot-api
+  chmod +x /usr/local/bin/telegram-bot-api
+  rm -rf /tmp/tgapi /tmp/tgapi.zip
+  echo "==> Binary installed"
 fi
 
-echo ""
-echo "Starting Flask server on port ${PORT:-5000}..."
-gunicorn server:app --bind "0.0.0.0:${PORT:-5000}" --workers 2 --daemon --log-file /tmp/flask.log
+mkdir -p /tmp/telegram-bot-api-data
 
-echo "Starting Telegram bot..."
+echo "==> Starting local Telegram Bot API server on port 8081..."
+telegram-bot-api \
+  --api-id="${TELEGRAM_API_ID}" \
+  --api-hash="${TELEGRAM_API_HASH}" \
+  --local \
+  --http-port=8081 \
+  --dir=/tmp/telegram-bot-api-data \
+  --log=/tmp/tgapi.log &
+
+# Wait for server to be ready
+echo "==> Waiting for local API server to start..."
+for i in $(seq 1 15); do
+  if curl -s http://127.0.0.1:8081/bot${BOT_TOKEN}/getMe > /dev/null 2>&1; then
+    echo "==> Local API server is ready!"
+    break
+  fi
+  sleep 1
+done
+
+echo "==> Starting bot..."
 python bot.py

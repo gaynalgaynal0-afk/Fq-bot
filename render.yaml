@@ -1,34 +1,24 @@
 services:
-  # ── Web service (Flask + Mini App) ────────────────────────────────────────
-  - type: web
-    name: wmv-bot-server
-    env: python
-    region: oregon
-    plan: free
-    buildCommand: |
-      apt-get update && apt-get install -y ffmpeg
-      pip install -r requirements.txt
-    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT --workers 2
-    envVars:
-      - key: SECRET_PATH
-        value: /secret-tools          # <-- change this to your own secret path!
-      - key: MINI_APP_URL
-        sync: false                   # set manually in Render dashboard
-
-  # ── Background worker (Telegram Bot) ─────────────────────────────────────
   - type: worker
-    name: wmv-bot-worker
-    env: python
-    region: oregon
-    plan: free
-    buildCommand: |
-      apt-get update && apt-get install -y ffmpeg
-      pip install -r requirements.txt
-    startCommand: python bot.py
+    name: fq-bot
+    runtime: python
+    buildCommand: apt-get update && apt-get install -y ffmpeg wget unzip && pip install -r requirements.txt
+    startCommand: bash start.sh
     envVars:
       - key: BOT_TOKEN
-        sync: false                   # set in Render dashboard (secret)
-      - key: MINI_APP_URL
-        sync: false                   # your Render web URL, e.g. https://wmv-bot-server.onrender.com
+        sync: false
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+
+  - type: web
+    name: fq-bot-web
+    runtime: python
+    buildCommand: pip install flask gunicorn
+    startCommand: gunicorn server:app --bind 0.0.0.0:$PORT
+    envVars:
       - key: SECRET_PATH
-        value: /secret-tools          # must match the web service above
+        value: /secret-tools
+      - key: MINI_APP_URL
+        sync: false
