@@ -8,6 +8,10 @@ import threading
 from pathlib import Path
 from flask import Flask
 
+# Use ffmpeg installed via imageio/pip — no apt-get needed
+import imageio_ffmpeg
+FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
@@ -46,16 +50,9 @@ def health():
 def run_flask():
     flask_app.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False)
 
-def check_ffmpeg():
-    try:
-        r = subprocess.run(["ffmpeg", "-version"], capture_output=True, timeout=5)
-        return r.returncode == 0
-    except Exception:
-        return False
-
 async def convert_to_wmv(input_path, output_path):
     cmd = [
-        "ffmpeg", "-i", input_path,
+        FFMPEG_PATH, "-i", input_path,
         "-c:v", "wmv2",
         "-q:v", "2",
         "-b:v", "0",
@@ -100,6 +97,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if message.video:
         file_obj = message.video
+        original_name = f"video_{message.video.file_unique_id}.mp4"
     elif message.document:
         doc = message.document
         fname = doc.file_name or ""
@@ -116,10 +114,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     size_mb = (file_obj.file_size or 0) / 1024 / 1024
     if size_mb > MAX_FILE_SIZE_MB:
         await message.reply_text(f"❌ File too large ({size_mb:.1f}MB). Max: {MAX_FILE_SIZE_MB}MB")
-        return
-
-    if not check_ffmpeg():
-        await message.reply_text("❌ FFmpeg not found on this server.")
         return
 
     status = await message.reply_text("⬇️ Downloading...")
@@ -171,6 +165,7 @@ def main():
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     logger.info(f"Flask running on port {PORT}")
+    logger.info(f"FFmpeg path: {FFMPEG_PATH}")
 
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
