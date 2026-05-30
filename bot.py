@@ -18,21 +18,18 @@ BOT_TOKEN    = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 MINI_APP_URL = "https://restless-star-a7e9.gaynalgaynal4.workers.dev/"
 PORT         = int(os.environ.get("PORT", 5000))
 
-LOCAL_API_PORT = 8081
-LOCAL_API_URL  = f"http://127.0.0.1:{LOCAL_API_PORT}/bot"
-
 SUPPORTED_FORMATS = [
     "mp4","avi","mov","mkv","flv","webm","m4v","3gp","ogv",
     "ts","mts","m2ts","wmv","asf","rm","rmvb","vob","mpeg","mpg"
 ]
 
-MAX_FILE_SIZE_MB = 2000
+MAX_FILE_SIZE_MB = 50
 
 START_MSG = (
-    "🎬 __*TIKTOK Studio method*__\n\n"
+    "\U0001f3ac __*TIKTOK Studio method*__\n\n"
     ">If you want to use the TIKTOK studio method sent a video file directly in chat\n"
-    "**>✅ Supported: mp4, avi, mov, mkv, flv, webm, m4v, 3gp\\.\\.\\.**\n"
-    "*📦 Max size: 2GB*"
+    "**>\\u2705 Supported: mp4, avi, mov, mkv, flv, webm, m4v, 3gp\\.\\.\\.**\n"
+    "*\U0001f4e6 Max size: 50MB*"
 )
 CAPTION_MSG = ">__*Upload this video using JV 60FPS studio extension*__"
 
@@ -56,7 +53,7 @@ def check_ffmpeg():
     except Exception:
         return False
 
-async def convert_to_wmv(input_path: str, output_path: str):
+async def convert_to_wmv(input_path, output_path):
     cmd = [
         "ffmpeg", "-i", input_path,
         "-c:v", "wmv2",
@@ -75,17 +72,17 @@ async def convert_to_wmv(input_path: str, output_path: str):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=3600)
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
         if proc.returncode == 0:
             return True, "OK"
-        return False, stderr.decode(errors="replace")[-500:]
+        return False, stderr.decode(errors="replace")[-300:]
     except asyncio.TimeoutError:
         return False, "Timeout"
     except Exception as e:
         return False, str(e)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))]]
+    keyboard = [[InlineKeyboardButton("\U0001f527 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))]]
     await update.message.reply_text(
         START_MSG, parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -93,8 +90,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Send any video file up to 2GB to convert it to WMV\n"
-        "Codec: wmv2 | Audio: wmav2 | Quality: near-lossless"
+        "Send any video file to convert it to WMV\nCodec: wmv2 | Audio: wmav2 | Container: ASF"
     )
 
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -104,7 +100,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if message.video:
         file_obj = message.video
-        original_name = f"video_{message.video.file_unique_id}.mp4"
     elif message.document:
         doc = message.document
         fname = doc.file_name or ""
@@ -148,6 +143,10 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         out_mb = os.path.getsize(output_path) / 1024 / 1024
+        if out_mb > 50:
+            await status.edit_text(f"❌ Output too large ({out_mb:.1f}MB) to send.")
+            return
+
         await status.edit_text(f"⬆️ Uploading ({out_mb:.1f}MB)...")
 
         with open(output_path, "rb") as f:
@@ -173,20 +172,12 @@ def main():
     flask_thread.start()
     logger.info(f"Flask running on port {PORT}")
 
-    app = (
-        Application.builder()
-        .token(BOT_TOKEN)
-        .base_url(LOCAL_API_URL)
-        .base_file_url(f"http://127.0.0.1:{LOCAL_API_PORT}/file/bot")
-        .local_mode(True)
-        .build()
-    )
-
+    app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.VIDEO | filters.Document.ALL, handle_video))
 
-    logger.info("Bot started — 2GB support active!")
+    logger.info("Bot started!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
