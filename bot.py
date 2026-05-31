@@ -37,9 +37,9 @@ app = Client("wmv_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 @app.on_message(filters.command("start"))
 async def start(client, message):
     await message.reply_text(
-        "🎬 Send me a video file up to 2GB to convert to WMV!",
+        "🎬 Send a video deractly in cat to convert it Studio 60fps upto 2gb supported",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))
+            InlineKeyboardButton("DUBOL DURASION PATCHER", web_app=WebAppInfo(url=MINI_APP_URL))
         ]])
     )
 
@@ -72,7 +72,7 @@ async def handle_video(client, message):
         output_name = Path(original_name).stem + ".wmv"
         output_path = os.path.join(tmp_dir, output_name)
         await client.download_media(message, file_name=input_path)
-        await status.edit_text("🔄 Converting to WMV (near-lossless)...")
+        await status.edit_text("🔄 Converting to jv_studio 60fps (near-lossless)...")
         ok, err = await convert_to_wmv(input_path, output_path)
         if not ok:
             await status.edit_text(f"❌ Conversion failed:\n{err[:200]}")
