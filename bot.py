@@ -37,7 +37,7 @@ app = Client("wmv_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 @app.on_message(filters.command("start"))
 async def start(client, message):
     await message.reply_text(
-        "🎬 Send a video deractly in cat to convert it Studio 60fps upto 2gb supported",
+        "🎬 Send a video diractly in cat to convert it Studio 60fps up to 2gb supported",
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("DUBOL DURASION PATCHER", web_app=WebAppInfo(url=MINI_APP_URL))
         ]])
