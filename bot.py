@@ -39,8 +39,7 @@ MAIN_MENU = ReplyKeyboardMarkup(
         [KeyboardButton("🎬 Convert video")],
         [KeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))],
     ],
-    resize_keyboard=True,
-    persistent=True
+    resize_keyboard=True
 )
 
 app = Client("wmv_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
