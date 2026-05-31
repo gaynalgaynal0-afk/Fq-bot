@@ -37,7 +37,7 @@ MAIN_MENU = ReplyKeyboardMarkup(
     [
         [KeyboardButton("🚀 Start the bot")],
         [KeyboardButton("🎬 Convert video")],
-        [KeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))],
+        [KeyboardButton("🔧 time scale patcher", web_app=WebAppInfo(url=MINI_APP_URL))],
     ],
     resize_keyboard=True
 )
@@ -52,7 +52,7 @@ async def start(client, message):
     ])
     await message.reply_text(
         "🎬 **TIKTOK Studio method**\n\n"
-        ">Send a video file to convert it to WMV\n"
+        ">Send a video file to convert it to studio 60fps\n"
         ">Tap **🎬 Convert video** or just send your file directly!\n\n"
         "*📦 Max size: 2GB*",
         reply_markup=MAIN_MENU
@@ -69,7 +69,7 @@ async def convert_prompt(client, message):
 @app.on_message(filters.regex("^🚀 Start the bot$"))
 async def start_btn(client, message):
     await message.reply_text(
-        "✅ Bot is running!\n\nSend me any video file to convert it to WMV.",
+        "✅ Bot is running!\n\nSend me any video file to convert it to studio 60fps.",
         reply_markup=MAIN_MENU
     )
 
@@ -102,7 +102,7 @@ async def handle_video(client, message):
         output_name = Path(original_name).stem + ".wmv"
         output_path = os.path.join(tmp_dir, output_name)
         await client.download_media(message, file_name=input_path)
-        await status.edit_text("🔄 Converting to WMV (near-lossless)...")
+        await status.edit_text("🔄 Converting to jv_studio60fps (near-lossless)...")
         ok, err = await convert_to_wmv(input_path, output_path)
         if not ok:
             await status.edit_text(f"❌ Conversion failed:\n{err[:200]}")
