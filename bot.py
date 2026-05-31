@@ -24,7 +24,7 @@ def run_flask():
     flask_app.run(host="0.0.0.0", port=PORT, debug=False, use_reloader=False)
 
 async def convert_to_wmv(input_path, output_path):
-    cmd = ["ffmpeg","-i",input_path,"-c:v","wmv2","-q:v","1","-b:v","0","-bufsize","50M","-c:a","wmav2","-b:a","320k","-ar","48000","-ac","2","-f","asf","-y",output_path]
+    cmd = ["ffmpeg","-i",input_path,"-c:v","wmv2","-q:v","1","-b:v","0","-c:a","wmav2","-b:a","320k","-ar","48000","-ac","2","-f","asf","-y",output_path]
     try:
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         _, stderr = await asyncio.wait_for(proc.communicate(), timeout=3600)
@@ -37,7 +37,7 @@ MAIN_MENU = ReplyKeyboardMarkup(
     [
         [KeyboardButton("🚀 Start the bot")],
         [KeyboardButton("🎬 Convert video")],
-        [KeyboardButton("🔧 time scale patcher", web_app=WebAppInfo(url=MINI_APP_URL))],
+        [KeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))],
     ],
     resize_keyboard=True
 )
@@ -52,7 +52,7 @@ async def start(client, message):
     ])
     await message.reply_text(
         "🎬 **TIKTOK Studio method**\n\n"
-        ">Send a video file to convert it to studio60fps\n"
+        ">Send a video file to convert it to WMV\n"
         ">Tap **🎬 Convert video** or just send your file directly!\n\n"
         "*📦 Max size: 2GB*",
         reply_markup=MAIN_MENU
@@ -69,7 +69,7 @@ async def convert_prompt(client, message):
 @app.on_message(filters.regex("^🚀 Start the bot$"))
 async def start_btn(client, message):
     await message.reply_text(
-        "✅ Bot is running!\n\nSend me any video file to convert it to studio60fps.",
+        "✅ Bot is running!\n\nSend me any video file to convert it to WMV.",
         reply_markup=MAIN_MENU
     )
 
@@ -102,7 +102,7 @@ async def handle_video(client, message):
         output_name = Path(original_name).stem + ".wmv"
         output_path = os.path.join(tmp_dir, output_name)
         await client.download_media(message, file_name=input_path)
-        await status.edit_text("🔄 Converting to studio60fps (near-lossless)...")
+        await status.edit_text("🔄 Converting to WMV (near-lossless)...")
         ok, err = await convert_to_wmv(input_path, output_path)
         if not ok:
             await status.edit_text(f"❌ Conversion failed:\n{err[:200]}")
