@@ -2,7 +2,7 @@ import os, logging, asyncio, subprocess, tempfile, shutil, threading
 from pathlib import Path
 from flask import Flask
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, BotCommand, ReplyKeyboardMarkup, KeyboardButton
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,15 +32,46 @@ async def convert_to_wmv(input_path, output_path):
     except Exception as e:
         return False, str(e)
 
+# ── Main menu keyboard ─────────────────────────────────────────────────────────
+MAIN_MENU = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("🚀 Start the bot")],
+        [KeyboardButton("🎬 Convert video")],
+        [KeyboardButton("🔧 Open Tools", web_app=WebAppInfo(url=MINI_APP_URL))],
+    ],
+    resize_keyboard=True,
+    persistent=True
+)
+
 app = Client("wmv_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 @app.on_message(filters.command("start"))
 async def start(client, message):
+    await client.set_bot_commands([
+        BotCommand("start", "Start the bot"),
+        BotCommand("convert", "Convert a video to WMV"),
+    ])
     await message.reply_text(
-        "🎬 Send a video diractly in cat to convert it Studio 60fps up to 2gb supported",
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("DUBOL DURASION PATCHER", web_app=WebAppInfo(url=MINI_APP_URL))
-        ]])
+        "🎬 **TIKTOK Studio method**\n\n"
+        ">Send a video file to convert it to WMV\n"
+        ">Tap **🎬 Convert video** or just send your file directly!\n\n"
+        "*📦 Max size: 2GB*",
+        reply_markup=MAIN_MENU
+    )
+
+@app.on_message(filters.command("convert") | filters.regex("^🎬 Convert video$"))
+async def convert_prompt(client, message):
+    await message.reply_text(
+        "📤 Send me your video file now!\n"
+        "Supported: " + ", ".join(SUPPORTED_FORMATS),
+        reply_markup=MAIN_MENU
+    )
+
+@app.on_message(filters.regex("^🚀 Start the bot$"))
+async def start_btn(client, message):
+    await message.reply_text(
+        "✅ Bot is running!\n\nSend me any video file to convert it to WMV.",
+        reply_markup=MAIN_MENU
     )
 
 @app.on_message(filters.video | filters.document)
@@ -58,7 +89,7 @@ async def handle_video(client, message):
             file_obj = doc
             original_name = fname or "video"
     if not file_obj:
-        await message.reply_text("Please send a video file.")
+        await message.reply_text("Please send a video file.\nSupported: " + ", ".join(SUPPORTED_FORMATS))
         return
     size_mb = (file_obj.file_size or 0)/1024/1024
     if size_mb > 2000:
@@ -72,7 +103,7 @@ async def handle_video(client, message):
         output_name = Path(original_name).stem + ".wmv"
         output_path = os.path.join(tmp_dir, output_name)
         await client.download_media(message, file_name=input_path)
-        await status.edit_text("🔄 Converting to jv_studio 60fps (near-lossless)...")
+        await status.edit_text("🔄 Converting to WMV (near-lossless)...")
         ok, err = await convert_to_wmv(input_path, output_path)
         if not ok:
             await status.edit_text(f"❌ Conversion failed:\n{err[:200]}")
