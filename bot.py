@@ -48,7 +48,7 @@ app = Client("wmv_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 async def start(client, message):
     await client.set_bot_commands([
         BotCommand("start", "Start the bot"),
-        BotCommand("convert", "Convert a video to WMV"),
+        BotCommand("convert", "Convert a video to studio60fps"),
     ])
     await message.reply_text(
         "🎬 **TIKTOK Studio method**\n\n"
